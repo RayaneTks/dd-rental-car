@@ -1,0 +1,56 @@
+# Prevent directory listing
+Options -Indexes
+
+# Protect against script injections
+Options +FollowSymLinks
+RewriteEngine On
+RewriteCond %{REQUEST_METHOD} (GET|POST) [NC]
+RewriteCond %{QUERY_STRING} (\<|%3C).*script.*(\>|%3E) [NC,OR]
+RewriteCond %{QUERY_STRING} GLOBALS(=|\[|\%[0-9A-Z]{0,2}) [OR]
+RewriteCond %{QUERY_STRING} _REQUEST(=|\[|\%[0-9A-Z]{0,2}) [OR]
+RewriteCond %{QUERY_STRING} ^.*(\[|\]|\(|\)|<|>).* [NC,OR]
+RewriteCond %{QUERY_STRING} (NULL|OUTFILE|LOAD_FILE) [OR]
+RewriteCond %{QUERY_STRING} (\./|\../|\.../)+ [OR]
+RewriteCond %{QUERY_STRING} (;|<|>|'|"|\)|%0A|%0D|%22|%27|%3C|%3E|%00).*(/\*|union|select|insert|drop|delete|update|cast|create|char|convert|alter|declare|order|script|set|md5|benchmark|encode) [NC,OR]
+RewriteCond %{QUERY_STRING} (sp_executesql) [NC]
+RewriteRule ^(.*)$ - [F,L]
+
+# Force HTTPS
+RewriteCond %{HTTPS} off
+RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# Protect against XSS, clickjacking and other vulnerabilities
+<IfModule mod_headers.c>
+    Header set X-XSS-Protection "1; mode=block"
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set X-Content-Type-Options "nosniff"
+    Header set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    Header set Content-Security-Policy "default-src 'self' 'unsafe-inline' 'unsafe-eval' https: data:; img-src 'self' https: data:; connect-src 'self' https:;"
+</IfModule>
+
+# Block access to sensitive files
+<FilesMatch "^(\.htaccess|\.htpasswd|\.git|\.env|\.json|\.lock|composer\.json|package\.json)$">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>
+
+# PHP security headers
+php_value session.cookie_httponly 1
+php_value session.use_only_cookies 1
+php_value session.cookie_secure 1
+php_value session.cookie_samesite "Strict"
+
+# Disable PHP error display
+php_flag display_errors off
+php_value error_reporting E_ALL
+
+# Block access to system files
+RedirectMatch 403 /\..*$
+RedirectMatch 403 ^/includes/.*$
+
+# Custom error pages
+ErrorDocument 400 /error.php
+ErrorDocument 401 /error.php
+ErrorDocument 403 /error.php
+ErrorDocument 404 /error.php
+ErrorDocument 500 /error.php
